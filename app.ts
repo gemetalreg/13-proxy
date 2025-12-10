@@ -6,6 +6,20 @@ interface RequestOptions {
   body?: BodyInit;
 }
 
+interface Product {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  // другие поля по необходимости
+}
+
+interface ApiResponse {
+  data?: Product;
+  error?: string;
+  status?: number;
+}
+
 class RequestBuilder {
   private method: HttpMethod = 'GET';
   private headers: Record<string, string> = {};
@@ -45,7 +59,7 @@ class RequestBuilder {
   }
 
   /**
-   * Устанавливает тело запроса (для POST, PUT и т.д.)
+   * Устанавливает тело запроса
    */
   setBody(body: BodyInit): this {
     this.body = body;
@@ -60,7 +74,6 @@ class RequestBuilder {
     this.addHeader('Content-Type', 'application/json');
     return this;
   }
-
 
   /**
    * Выполняет запрос
@@ -95,9 +108,45 @@ class RequestBuilder {
       }
     } catch (error) {
       if (error instanceof Error) {
-        throw new Error(error.message);
+        throw new Error(`Request failed: ${error.message}`);
       }
       throw error;
     }
+  }
+}
+
+// Интерфейс для API
+interface IProductAPI {
+  getProduct(productId: number): Promise<Product>;
+}
+
+// Реальная реализация API
+class ProductAPI implements IProductAPI {
+  private baseUrl: string = 'https://dummyjson.com/products';
+
+  async getProduct(productId: number): Promise<Product> {
+    return await new RequestBuilder()
+      .setMethod('GET')
+      .setUrl(`${this.baseUrl}/${productId}`)
+      .exec<Product>();
+  }
+}
+
+// Proxy реализация с фильтрацией
+class ProductProxy implements IProductAPI {
+  private realApi: IProductAPI;
+
+  constructor(api?: IProductAPI) {
+    this.realApi = api || new ProductAPI();
+  }
+
+  async getProduct(productId: number): Promise<Product> {
+    // Проверка условия перед выполнением запроса
+    if (productId > 10) {
+      throw new Error(`ID ${productId} is too large. Only IDs less than 10 are allowed`);
+    }
+
+    // Если проверка пройдена, делегируем запрос реальному API
+    return await this.realApi.getProduct(productId);
   }
 }
