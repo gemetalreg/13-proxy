@@ -8,6 +8,10 @@ interface RequestOptions {
 
 interface Product {
   id: number;
+  title: string;
+  description: string;
+  price: number;
+  // другие поля по необходимости
 }
 
 interface ApiResponse {
@@ -15,7 +19,6 @@ interface ApiResponse {
   error?: string;
   status?: number;
 }
-
 
 class RequestBuilder {
   private method: HttpMethod = 'GET';
@@ -56,7 +59,7 @@ class RequestBuilder {
   }
 
   /**
-   * Устанавливает тело запроса (для POST, PUT и т.д.)
+   * Устанавливает тело запроса
    */
   setBody(body: BodyInit): this {
     this.body = body;
@@ -71,7 +74,6 @@ class RequestBuilder {
     this.addHeader('Content-Type', 'application/json');
     return this;
   }
-
 
   /**
    * Выполняет запрос
@@ -106,34 +108,61 @@ class RequestBuilder {
       }
     } catch (error) {
       if (error instanceof Error) {
-        throw new Error(error.message);
+        throw new Error(`Request failed: ${error.message}`);
       }
       throw error;
     }
   }
 }
 
-class SimpleProductProxy {
+// Интерфейс для API
+interface IProductAPI {
+  getProduct(productId: number): Promise<Product>;
+}
+
+// Реальная реализация API
+class ProductAPI implements IProductAPI {
   private baseUrl: string = 'https://dummyjson.com/products';
 
-  async getProduct(productId: number): Promise<ApiResponse> {
+  async getProduct(productId: number): Promise<Product> {
+    return await new RequestBuilder()
+      .setMethod('GET')
+      .setUrl(`${this.baseUrl}/${productId}`)
+      .exec<Product>();
+  }
+}
+
+// Proxy реализация с фильтрацией
+class ProductProxy implements IProductAPI {
+  private realApi: IProductAPI;
+
+  constructor(api?: IProductAPI) {
+    this.realApi = api || new ProductAPI();
+  }
+
+  async getProduct(productId: number): Promise<Product> {
+    // Проверка условия перед выполнением запроса
     if (productId > 10) {
-      return {
-        error: `ID ${productId} is too large. Only IDs less than 10 are allowed`,
-        status: 400
-      };
+      throw new Error(`ID ${productId} is too large. Only IDs less than 10 are allowed`);
     }
 
-    try {
-      const response = await new RequestBuilder().setMethod("GET").setUrl(`${this.baseUrl}/${productId}`).exec();
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const product: Product = await response.json();
-      return { data: product };
+    // Если проверка пройдена, делегируем запрос реальному API
+    return await this.realApi.getProduct(productId);
+  }
+}
 
+// Фасад для удобного использования с обработкой ошибок
+class ProductService {
+  private proxy: IProductAPI;
+
+  constructor(api?: IProductAPI) {
+    this.proxy = api || new ProductProxy();
+  }
+
+  async getProduct(productId: number): Promise<ApiResponse> {
+    try {
+      const product = await this.proxy.getProduct(productId);
+      return { data: product };
     } catch (error: any) {
       return {
         error: error.message || 'Unknown error occurred',
