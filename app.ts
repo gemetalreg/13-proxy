@@ -150,24 +150,3 @@ class ProductProxy implements IProductAPI {
     return await this.realApi.getProduct(productId);
   }
 }
-
-// Фасад для удобного использования с обработкой ошибок
-class ProductService {
-  private proxy: IProductAPI;
-
-  constructor(api?: IProductAPI) {
-    this.proxy = api || new ProductProxy();
-  }
-
-  async getProduct(productId: number): Promise<ApiResponse> {
-    try {
-      const product = await this.proxy.getProduct(productId);
-      return { data: product };
-    } catch (error: any) {
-      return {
-        error: error.message || 'Unknown error occurred',
-        status: 400
-      };
-    }
-  }
-}
