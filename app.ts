@@ -6,6 +6,17 @@ interface RequestOptions {
   body?: BodyInit;
 }
 
+interface Product {
+  id: number;
+}
+
+interface ApiResponse {
+  data?: Product;
+  error?: string;
+  status?: number;
+}
+
+
 class RequestBuilder {
   private method: HttpMethod = 'GET';
   private headers: Record<string, string> = {};
@@ -98,6 +109,36 @@ class RequestBuilder {
         throw new Error(error.message);
       }
       throw error;
+    }
+  }
+}
+
+class SimpleProductProxy {
+  private baseUrl: string = 'https://dummyjson.com/products';
+
+  async getProduct(productId: number): Promise<ApiResponse> {
+    if (productId > 10) {
+      return {
+        error: `ID ${productId} is too large. Only IDs less than 10 are allowed`,
+        status: 400
+      };
+    }
+
+    try {
+      const response = await new RequestBuilder().setMethod("GET").setUrl(`${this.baseUrl}/${productId}`).exec();
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const product: Product = await response.json();
+      return { data: product };
+
+    } catch (error: any) {
+      return {
+        error: error.message || 'Unknown error occurred',
+        status: 400
+      };
     }
   }
 }
